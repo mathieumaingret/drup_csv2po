@@ -1,0 +1,10 @@
+{
+  "name": "drupal/drup_csv2po",
+  "type": "drupal-module",
+  "description": "",
+  "require": {
+    "php": "^7.0 || ^8.0",
+    "gettext/gettext": "^4.8",
+    "league/csv": "^9.8"
+  }
+}

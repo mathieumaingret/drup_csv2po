@@ -1,0 +1,5 @@
+services:
+  drup_csv2po.commands:
+    class: \Drupal\drup_csv2po\Commands\DrupCsv2poCommands
+    tags:
+      - { name: drush.command }

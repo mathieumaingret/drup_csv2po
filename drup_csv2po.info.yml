@@ -1,0 +1,6 @@
+name: Drup Csv2Po
+type: module
+description: The description.
+package: Drup
+core: 8.x
+core_version_requirement: ^8 || ^9
