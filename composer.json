@@ -1,5 +1,5 @@
 {
-  "name": "drupal/drup_csv2po",
+  "name": "mathieumaingret/drup_csv2po",
   "type": "drupal-module",
   "description": "",
   "require": {
