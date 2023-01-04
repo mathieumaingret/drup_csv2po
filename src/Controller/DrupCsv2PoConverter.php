@@ -4,10 +4,16 @@ namespace Drupal\drup_csv2po\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Datetime\DrupalDateTime;
+use Drupal\Core\Extension\ExtensionList;
+use Drupal\Core\Extension\ModuleExtensionList;
+use Drupal\Core\Extension\ThemeExtensionList;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Language\Language;
+use Drupal\Core\Theme\ThemeManagerInterface;
+use Drupal\Core\Url;
 use Drupal\facets\Exception\Exception;
 use Drupal\file\FileRepository;
+use Drupal\pathauto\MessengerInterface;
 use League\Csv\Reader;
 use Gettext\Translations;
 use Gettext\Translation;
@@ -20,9 +26,31 @@ use Gettext\Loader\PoLoader;
 class DrupCsv2PoConverter extends ControllerBase {
 
     /**
-     * @var string Name of CSV file containing values
+     * @var array
      */
-    protected string $csvFileName;
+    private array $options;
+
+    /**
+     * @var array
+     */
+    public static array $defaultOptions = [
+        // theme or module
+        'extension_type' => 'theme',
+        // theme or module machine name
+        'extension_name' => null,
+        // translation directory name
+        'extension_translations_directory' => 'translations',
+        // download csv content from remote url before converting
+        'csv_remote_url' => null,
+        // save remove csv content to local file
+        'csv_output_filename' => 'translations.csv',
+        // erase all existant translation
+        'translations_replace_all' => TRUE,
+        // allow to update existing translation if they exist, or force to create new ones
+        'translations_allow_update' => FALSE,
+        // separator for multiple cell values
+        'plural_value_separator' => PHP_EOL
+    ];
 
     /**
      * @var string
@@ -40,59 +68,133 @@ class DrupCsv2PoConverter extends ControllerBase {
     protected \League\Csv\Reader $csvReader;
 
     /**
-     * @var array
+     * @var \Drupal\Core\File\FileSystemInterface
      */
-    public static array $defaultOptions = [
-        // theme or module
-        'extension_type' => 'theme',
-        // theme or module machine name
-        'extension_name' => 'frontend',
-        // translation directory name
-        'translation_directory_name' => 'translations',
-        // download csv content from remote url before converting
-        'remote_csv_url' => null,
-        // erase all existant translation
-        'translations_replace_all' => TRUE,
-        // allow to update existing translation if they exist, or force to create new ones
-        'translations_allow_update' => FALSE,
-        // separator for multiple cell values
-        'plural_value_separator' => PHP_EOL
-    ];
+    private FileSystemInterface $file_system;
 
     /**
-     * @param string $csvFileName
-     * @param array $options
+     * @var \Drupal\Core\Extension\ExtensionList
      */
-    public function __construct(string $csvFileName, array $options = []) {
-        $this->csvFileName = $csvFileName;
-        $this->options = array_merge(self::$defaultOptions, $options);
+    private ExtensionList $extension_list;
 
-        $this->translationDirectoryPath = \Drupal::service('extension.list.' . $this->getOption('extension_type'))->getPath($this->getOption('extension_name'));
-        $this->translationDirectoryPath = './' . rtrim($this->translationDirectoryPath, '/') . '/' . $this->getOption('translation_directory_name') . '/';
+    /**
+     * @var \Drupal\Core\Theme\ThemeManagerInterface
+     */
+    private ThemeManagerInterface $theme_manager;
 
-        if (!empty($this->getOption('remote_csv_url'))) {
-            $this->downloadCsv();
-        }
+    /**
+     * @var \Drupal\Core\Extension\ThemeExtensionList
+     */
+    private ThemeExtensionList $theme_extension_list;
 
-        // Read csv data
-        $this->readCsv();
+    /**
+     * @var \Drupal\Core\Extension\ModuleExtensionList
+     */
+    private ModuleExtensionList $module_extension_list;
+
+    /**
+     * @param \Drupal\Core\File\FileSystemInterface $file_system
+     * @param \Drupal\Core\Extension\ModuleExtensionList $module_extension_list
+     * @param \Drupal\Core\Extension\ThemeExtensionList $theme_extension_list
+     */
+    public function __construct(FileSystemInterface $file_system, ModuleExtensionList $module_extension_list, ThemeExtensionList $theme_extension_list, ThemeManagerInterface $theme_manager) {
+        $this->file_system = $file_system;
+        $this->theme_manager = $theme_manager;
+        $this->theme_extension_list = $theme_extension_list;
+        $this->module_extension_list = $module_extension_list;
+
+        $this->options = self::$defaultOptions;
     }
+
+    public function setOption($key, $value) {
+        $this->options[$key] = $value;
+        return $this;
+    }
+
+    public function setOptions($options) {
+        $this->options = $options;
+        return $this;
+    }
+
+    public function getOption($key) {
+        return $this->options[$key] ?? NULL;
+    }
+
+    public function getOptions() {
+        return $this->options;
+    }
+
 
     public function run() {
-        // Treat each language po file
-        if (!empty($this->csvLanguages)) {
-            foreach ($this->csvLanguages as $index => $csvLanguage) {
-                $this->updatePoFile($csvLanguage);
+        // Options management
+        if ($this->prepareOptions()) {
+            // Download remote CSV file
+            $this->downloadCsv();
+            // Read file for parsing
+            $this->readCsv();
+
+            // Treat each language po file
+            if (!empty($this->csvLanguages)) {
+                foreach ($this->csvLanguages as $index => $csvLanguage) {
+                    $this->updatePoFile($csvLanguage);
+                }
             }
         }
+
+        $this->cleanup();
+
+        return $this;
     }
 
+
     /**
-     * @return void
+     * @return bool
      */
+    protected function prepareOptions() {
+        $this->extension_list = $this->getOption('extension_type') === 'theme' ? $this->theme_extension_list : $this->module_extension_list;
+
+        // Error is extension is module but no module name provided
+        if ($this->getOption('extension_type') === 'module' && empty($this->getOption('extension_name'))) {
+            $this->messenger()->addError($this->t('Option <em>@option</em> is missing or misspelled', ['@option' => 'extension_name']));
+            return false;
+        }
+        // Set default theme if not defined
+        if ($this->getOption('extension_type') === 'theme' && empty($this->getOption('extension_name'))) {
+            $this->setOption('extension_name', $this->theme_manager->getActiveTheme()->getName());
+        }
+
+        // Directories
+        $this->translationDirectoryPath = $this->extension_list->getPath($this->getOption('extension_name'));
+        $this->translationDirectoryPath = './' . rtrim($this->translationDirectoryPath, '/') . '/' . $this->getOption('extension_translations_directory') . '/';
+
+        // Remote url is mandatory but empty
+        if (empty($this->getOption('csv_remote_url'))) {
+            $this->messenger()->addError($this->t('Option <em>@option</em> is missing or misspelled', ['@option' => 'csv_remote_url']));
+            return false;
+        }
+
+        return true;
+    }
+
+
+    protected function downloadCsv() {
+        try {
+            $this->messenger()->addMessage($this->t('Downloading file...'));
+            $content = file_get_contents($this->getOption('csv_remote_url'));
+            file_put_contents($this->translationDirectoryPath . $this->getOption('csv_output_filename'), $content);
+            $this->messenger()->addStatus($this->t('File downloaded'));
+        }
+        catch (\Exception $exception) {
+            $this->messenger()->addError($this->t('Unable to download file'));
+            $this->messenger()->addError($exception->getMessage());
+        }
+
+        return $this;
+    }
+
     protected function readCsv() {
-        \Drupal::messenger()->addStatus($this->t('Reading file...'));
-        $this->csvReader = Reader::createFromPath($this->translationDirectoryPath . $this->csvFileName, 'r');
+        $this->messenger()->addMessage($this->t('Reading file...'));
+        $this->csvReader = Reader::createFromPath($this->translationDirectoryPath . $this->getOption('csv_output_filename'), 'r');
         $this->csvReader->setHeaderOffset(0);
 
         $headers = $this->csvReader->getHeader();
@@ -105,22 +207,9 @@ class DrupCsv2PoConverter extends ControllerBase {
                 $this->csvLanguages[$langcode] = $this->languageManager()->getLanguage($langcode);
             }
         }
-        \Drupal::messenger()->addStatus($this->t('File read'));
-    }
+        $this->messenger()->addMessage($this->t('File read'));
 
-    /**
-     * @return void
-     */
-    protected function downloadCsv() {
-        try {
-            \Drupal::messenger()->addStatus($this->t('Downloading file...'));
-            $content = file_get_contents($this->getOption('remote_csv_url'));
-            file_put_contents($this->translationDirectoryPath . $this->csvFileName, $content);
-            \Drupal::messenger()->addStatus($this->t('File downloaded'));
-
-        } catch (Exception $exception) {
-
-        }
+        return $this;
     }
 
     /**
@@ -131,10 +220,10 @@ class DrupCsv2PoConverter extends ControllerBase {
      */
     protected function updatePoFile(Language $language) {
         $langcode = $language->getId();
-        $filename = 'frontend.' . $langcode . '.po';
+        $filename = $this->getOption('extension_name') . '.' . $langcode . '.po';
         $filepath = $this->translationDirectoryPath . $filename;
 
-        \Drupal::messenger()->addStatus($this->t('Treating @file...', ['@file' => $filepath]));
+        $this->messenger()->addMessage($this->t('Treating @file...', ['@file' => $filepath]));
 
         $loader = new PoLoader();
         $generator = new PoGenerator();
@@ -143,7 +232,7 @@ class DrupCsv2PoConverter extends ControllerBase {
 
         //
         if (!@file_exists($filepath)) {
-            \Drupal::service('file_system')->createFilename($filename, $this->translationDirectoryPath);
+            $this->file_system->createFilename($filename, $this->translationDirectoryPath);
         }
 
         // Remplacement total : création fichier
@@ -208,7 +297,7 @@ class DrupCsv2PoConverter extends ControllerBase {
         // Save file
         $generator->generateFile($translations, $filepath);
 
-        \Drupal::messenger()->addStatus($this->t('File @filename has been generated', ['@filename' => $filepath]));
+        $this->messenger()->addStatus($this->t('File @filename has been generated', ['@filename' => $filepath]));
     }
 
     /**
@@ -250,17 +339,8 @@ class DrupCsv2PoConverter extends ControllerBase {
         return $translation;
     }
 
-
-    public function setOption($key, $value) {
-        $this->options[$key] = $value;
+    protected function cleanup() {
+        $url = Url::fromRoute('locale.translate_status');
+        $this->messenger()->addStatus($this->t('Everything done. Check newly po generated files and go to the <a href=":url">:url</a> to import updates', [':url' => $url->setAbsolute()->toString()]));
     }
-
-    public function getOption($key) {
-        return $this->options[$key] ?? NULL;
-    }
-
-    public function getOptions() {
-        return $this->options;
-    }
-
 }

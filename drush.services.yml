@@ -1,5 +1,8 @@
 services:
+  drup_csv2po.converter:
+    class: Drupal\drup_csv2po\Controller\DrupCsv2PoConverter
+    arguments: [ '@file_system', '@extension.list.module', '@extension.list.theme', '@theme.manager' ]
   drup_csv2po.commands:
-    class: \Drupal\drup_csv2po\Commands\DrupCsv2poCommands
+    class: Drupal\drup_csv2po\Commands\DrupCsv2poCommands
     tags:
       - { name: drush.command }

@@ -22,9 +22,6 @@ class DrupCsv2poCommands extends DrushCommands {
     /**
      * Convert existing CSV translation file to PO files
      *
-     * @param $csv_filename
-     *   CSV filename
-     *
      * @param array $options
      *   An associative array of options whose values come from cli, aliases, config, etc.
      *
@@ -32,10 +29,12 @@ class DrupCsv2poCommands extends DrushCommands {
      *   theme or module
      * @option extension_name
      *   theme or module machine name
-     * @option translation_directory_name
+     * @option extension_translations_directory
      *   translation directory name
-     * @option remote_csv_url
+     * @option csv_remote_url
      *   download csv content from remote url before converting
+     * @option csv_output_filename
+     *   save remove csv content to local file
      * @option translations_replace_all
      *   erase all existant translation
      * @option translations_allow_update
@@ -49,17 +48,19 @@ class DrupCsv2poCommands extends DrushCommands {
      * @command drup_csv2po:csv2po
      * @aliases csv2po
      */
-    public function convertCsv2Po(string $csv_filename, array $options = [
+    public function convertCsv2Po(array $options = [
         'extension_type' => 'theme',
-        'extension_name' => 'frontend',
-        'translation_directory_name' => 'translations',
-        'remote_csv_url' => null,
+        'extension_name' => null,
+        'extension_translations_directory' => 'translations',
+        'csv_remote_url' => null,
+        'csv_output_filename' => 'translations.csv',
         'translations_replace_all' => TRUE,
         'translations_allow_update' => FALSE,
-        'plural_value_separator' => PHP_EOL,
+        'plural_value_separator' => PHP_EOL
     ]
     ) {
-        $controller = new DrupCsv2PoConverter($csv_filename, $options);
-        $controller->run();
+        /** @var DrupCsv2PoConverter $drupCsv2PoConverter */
+        $drupCsv2PoConverter = \Drupal::service('drup_csv2po.converter');
+        $drupCsv2PoConverter->setOptions($options)->run();
     }
 }
