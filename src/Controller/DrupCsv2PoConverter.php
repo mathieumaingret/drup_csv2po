@@ -256,7 +256,7 @@ class DrupCsv2PoConverter extends ControllerBase {
         // Traitement traductions
         $previousTranslationComment = '';
         foreach ($this->csvReader->getRecords() as $record) {
-            if (isset($record['EN'], $record[strtoupper($langcode)]) && !empty($record[strtoupper($langcode)])) {
+            if (isset($record['EN'], $record[strtoupper($langcode)]) && !empty($record['EN']) && !empty($record[strtoupper($langcode)])) {
                 $record['__SOURCE'] = trim($record['EN']);
                 $record['__VALUE'] = trim($record[strtoupper($langcode)]);
 
