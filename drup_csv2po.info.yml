@@ -1,6 +1,6 @@
 name: Drup Csv2Po
 type: module
-description: The description.
+description: "Import translations from GSheet"
 package: Drup
 core: 8.x
-core_version_requirement: ^8 || ^9
+core_version_requirement: ^9 || ^10
