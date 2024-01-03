@@ -2,7 +2,6 @@
 
 namespace Drupal\drup_csv2po\Commands;
 
-use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\drup_csv2po\Controller\DrupCsv2PoConverter;
 use Drush\Commands\DrushCommands;
 
@@ -19,48 +18,51 @@ use Drush\Commands\DrushCommands;
  */
 class DrupCsv2poCommands extends DrushCommands {
 
-    /**
-     * Convert existing CSV translation file to PO files
-     *
-     * @param array $options
-     *   An associative array of options whose values come from cli, aliases, config, etc.
-     *
-     * @option extension_type
-     *   theme or module
-     * @option extension_name
-     *   theme or module machine name
-     * @option extension_translations_directory
-     *   translation directory name
-     * @option csv_remote_url
-     *   download csv content from remote url before converting
-     * @option csv_output_filename
-     *   save remove csv content to local file
-     * @option translations_replace_all
-     *   erase all existant translation
-     * @option translations_allow_update
-     *   allow to update existing translation if they exist, or force to create new ones
-     * @option plural_value_separator
-     *   separator for multiple cell values
-     *
-     * @usage drup_csv2po-convertCsv2Po csv2po
-     *   Usage description
-     *
-     * @command drup_csv2po:csv2po
-     * @aliases csv2po
-     */
-    public function convertCsv2Po(array $options = [
-        'extension_type' => 'theme',
-        'extension_name' => null,
-        'extension_translations_directory' => 'translations',
-        'csv_remote_url' => null,
-        'csv_output_filename' => 'translations.csv',
-        'translations_replace_all' => TRUE,
-        'translations_allow_update' => FALSE,
-        'plural_value_separator' => PHP_EOL
-    ]
-    ) {
-        /** @var DrupCsv2PoConverter $drupCsv2PoConverter */
-        $drupCsv2PoConverter = \Drupal::service('drup_csv2po.converter');
-        $drupCsv2PoConverter->setOptions($options)->run();
-    }
+  /**
+   * Convert existing CSV translation file to PO files
+   *
+   * @param array $options
+   *   An associative array of options whose values come from cli, aliases,
+   *   config, etc.
+   *
+   * @option extension_type
+   *   theme or module
+   * @option extension_name
+   *   theme or module machine name
+   * @option extension_translations_directory
+   *   translation directory name
+   * @option csv_remote_url
+   *   download csv content from remote url before converting
+   * @option csv_output_filename
+   *   save remove csv content to local file
+   * @option translations_replace_all
+   *   erase all existant translation
+   * @option translations_allow_update
+   *   allow to update existing translation if they exist, or force to create
+   *   new ones
+   * @option plural_value_separator
+   *   separator for multiple cell values
+   *
+   * @usage drup_csv2po-convertCsv2Po csv2po
+   *   Usage description
+   *
+   * @command drup_csv2po:csv2po
+   * @aliases csv2po
+   */
+  public function convertCsv2Po(array $options = [
+    'extension_type' => NULL,
+    'extension_name' => NULL,
+    'extension_translations_directory' => NULL,
+    'csv_remote_url' => NULL,
+    'csv_output_filename' => NULL,
+    'translations_replace_all' => NULL,
+    'translations_allow_update' => NULL,
+    'plural_value_separator' => NULL,
+  ]
+  ) {
+    /** @var DrupCsv2PoConverter $drupCsv2PoConverter */
+    $drupCsv2PoConverter = \Drupal::service('drup_csv2po.converter');
+    $drupCsv2PoConverter->setOptions($options)->run();
+  }
+
 }

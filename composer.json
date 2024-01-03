@@ -1,13 +1,13 @@
 {
     "name": "mathieumaingret/drup_csv2po",
-    "version": "1.1",
+    "version": "1.2",
     "type": "drupal-module",
     "description": "",
     "homepage": "https://github.com/mathieumaingret/drup_csv2po",
     "license": "GPL-2.0-or-later",
     "require": {
-        "php": "^7.0 || ^8.0",
+        "php": "^8.0",
         "gettext/gettext": "^5.7",
-        "league/csv": "^9.8"
+        "league/csv": "^9.14"
     }
 }
