@@ -8,7 +8,6 @@ use Drupal\Core\Extension\ExtensionList;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ThemeExtensionList;
 use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Language\Language;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Url;
@@ -43,6 +42,8 @@ class DrupCsv2PoConverter extends ControllerBase {
     'translations_allow_update' => FALSE,
     // separator for multiple cell values
     'plural_value_separator' => PHP_EOL,
+    // if true, import only enabled languages
+    'check_enabled_languages' => TRUE,
   ];
 
   /**
@@ -53,7 +54,7 @@ class DrupCsv2PoConverter extends ControllerBase {
   /**
    * @var array
    */
-  protected array $csvLanguages = [];
+  protected array $csvLangcodes = [];
 
   /**
    * @var \League\Csv\Reader
@@ -125,9 +126,9 @@ class DrupCsv2PoConverter extends ControllerBase {
       // Download remote CSV file + Read file for parsing
       if ($this->downloadCsv() && $this->readCsv()) {
         // Treat each language po file
-        if (!empty($this->csvLanguages)) {
-          foreach ($this->csvLanguages as $csvLanguage) {
-            $this->updatePoFile($csvLanguage);
+        if (!empty($this->csvLangcodes)) {
+          foreach ($this->csvLangcodes as $csvLangcode) {
+            $this->updatePoFile($csvLangcode);
           }
         }
         $this->cleanup();
@@ -198,14 +199,14 @@ class DrupCsv2PoConverter extends ControllerBase {
       $content = file_get_contents($this->getOption('csv_remote_url'));
       file_put_contents($this->translationDirectoryPath . $this->getOption('csv_output_filename'), $content);
       $this->messenger()->addStatus($this->t('File downloaded'));
-      return true;
+      return TRUE;
     }
     catch (\Exception $exception) {
       $this->messenger()->addError($this->t('Unable to download file'));
       $this->messenger()->addError($exception->getMessage());
     }
 
-    return false;
+    return FALSE;
   }
 
   /**
@@ -217,41 +218,44 @@ class DrupCsv2PoConverter extends ControllerBase {
     try {
       $this->csvReader = Reader::createFromPath($this->translationDirectoryPath . $this->getOption('csv_output_filename'));
       if ($this->csvReader->count() < 1) {
-        $this->messenger()->addMessage($this->t('File is empty, nothing to do.'));
-        return false;
+        $this->messenger()
+          ->addMessage($this->t('File is empty, nothing to do.'));
+        return FALSE;
       }
 
       $this->csvReader->setHeaderOffset(0);
 
       $headers = $this->csvReader->getHeader();
 
+      $langcodes = $this->languageManager()->getStandardLanguageListWithoutConfigured();
+
       // Récup des langues disponibles dans le fichier csv
       foreach ($headers as $header) {
         $langcode = strtolower($header);
 
-        if ($langcode !== 'en' && $this->languageManager()
-            ->getLanguage($langcode) instanceof \Drupal\Core\Language\LanguageInterface) {
-          $this->csvLanguages[$langcode] = $this->languageManager()
-            ->getLanguage($langcode);
+        if ($langcode !== 'en') {
+          if ((bool) $this->getOption('check_enabled_languages') === FALSE && isset($langcodes[$langcode])) {
+            $this->csvLangcodes[$langcode] = $langcode;
+          }
+          elseif ($this->languageManager()->getLanguage($langcode) instanceof \Drupal\Core\Language\LanguageInterface) {
+            $this->csvLangcodes[$langcode] = $langcode;
+          }
         }
       }
       $this->messenger()->addMessage($this->t('File read'));
-
-    } catch (\League\Csv\Exception $exception) {
+    }
+    catch (\League\Csv\Exception $exception) {
       $this->messenger()->addError($exception->getMessage());
     }
 
-    return true;
+    return TRUE;
   }
 
   /**
    *
-   * @param \Drupal\Core\Language\Language $language
-   *
-   * @return void
+   * @param string $langcode
    */
-  protected function updatePoFile(Language $language) {
-    $langcode = $language->getId();
+  protected function updatePoFile(string $langcode) {
     $filename = $this->getOption('extension_name') . '.' . $langcode . '.po';
     $filepath = $this->translationDirectoryPath . $filename;
 
@@ -396,7 +400,7 @@ class DrupCsv2PoConverter extends ControllerBase {
 
     $settings = Settings::get('drup_csv2po');
     if (!empty($settings)) {
-      $defaults = array_merge($defaults, array_filter($settings));
+      $defaults = array_merge($defaults, ($settings));
     }
 
     $this->options = $defaults;

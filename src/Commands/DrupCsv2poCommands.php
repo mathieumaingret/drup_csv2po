@@ -42,6 +42,8 @@ class DrupCsv2poCommands extends DrushCommands {
    *   new ones
    * @option plural_value_separator
    *   separator for multiple cell values
+   * @option check_enabled_languages
+   *   if true, import only enabled languages
    *
    * @usage drup_csv2po-convertCsv2Po csv2po
    *   Usage description
@@ -58,6 +60,7 @@ class DrupCsv2poCommands extends DrushCommands {
     'translations_replace_all' => NULL,
     'translations_allow_update' => NULL,
     'plural_value_separator' => NULL,
+    'check_enabled_languages' => NULL,
   ]
   ) {
     /** @var DrupCsv2PoConverter $drupCsv2PoConverter */
