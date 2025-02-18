@@ -62,7 +62,7 @@ class DrupCsv2poCommands extends DrushCommands {
     'plural_value_separator' => NULL,
     'check_enabled_languages' => NULL,
   ]
-  ) {
+  ): void {
     /** @var DrupCsv2PoConverter $drupCsv2PoConverter */
     $drupCsv2PoConverter = \Drupal::service('drup_csv2po.converter');
     $drupCsv2PoConverter->setOptions($options)->run();

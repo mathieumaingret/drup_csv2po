@@ -67,43 +67,23 @@ class DrupCsv2PoConverter extends ControllerBase {
   private array $options = [];
 
   /**
-   * @var \Drupal\Core\File\FileSystemInterface
-   */
-  private FileSystemInterface $file_system;
-
-  /**
    * @var \Drupal\Core\Extension\ExtensionList
    */
   private ExtensionList $extension_list;
 
-  /**
-   * @var \Drupal\Core\Theme\ThemeManagerInterface
-   */
-  private ThemeManagerInterface $theme_manager;
-
-  /**
-   * @var \Drupal\Core\Extension\ThemeExtensionList
-   */
-  private ThemeExtensionList $theme_extension_list;
-
-  /**
-   * @var \Drupal\Core\Extension\ModuleExtensionList
-   */
-  private ModuleExtensionList $module_extension_list;
-
-  public function __construct(FileSystemInterface $file_system, ModuleExtensionList $module_extension_list, ThemeExtensionList $theme_extension_list, ThemeManagerInterface $theme_manager) {
-    $this->file_system = $file_system;
-    $this->theme_manager = $theme_manager;
-    $this->theme_extension_list = $theme_extension_list;
-    $this->module_extension_list = $module_extension_list;
-
+  public function __construct(
+    private readonly FileSystemInterface $file_system,
+    private readonly ModuleExtensionList $module_extension_list,
+    private readonly ThemeExtensionList $theme_extension_list,
+    private readonly ThemeManagerInterface $theme_manager
+  ) {
     $this->setDefaultOptions();
   }
 
   /**
    * @return array
    */
-  public function getOptions() {
+  public function getOptions(): array {
     return $this->options;
   }
 
@@ -112,7 +92,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @return $this
    */
-  public function setOptions($options) {
+  public function setOptions($options): static {
     $this->options = array_merge($this->options, array_filter($options));
     return $this;
   }
@@ -120,7 +100,7 @@ class DrupCsv2PoConverter extends ControllerBase {
   /**
    * @return $this
    */
-  public function run() {
+  public function run(): static {
     // Options management
     if ($this->prepareOptions()) {
       // Download remote CSV file + Read file for parsing
@@ -141,7 +121,7 @@ class DrupCsv2PoConverter extends ControllerBase {
   /**
    * @return bool
    */
-  protected function prepareOptions() {
+  protected function prepareOptions(): bool {
     $this->extension_list = $this->getOption('extension_type') === 'theme' ? $this->theme_extension_list : $this->module_extension_list;
 
     // Error is extension is module but no module name provided
@@ -175,7 +155,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @return mixed|null
    */
-  public function getOption($key) {
+  public function getOption($key): mixed {
     return $this->options[$key] ?? NULL;
   }
 
@@ -185,7 +165,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @return $this
    */
-  public function setOption($key, $value) {
+  public function setOption($key, $value): static {
     $this->options[$key] = $value;
     return $this;
   }
@@ -193,7 +173,7 @@ class DrupCsv2PoConverter extends ControllerBase {
   /**
    * @return bool
    */
-  protected function downloadCsv() {
+  protected function downloadCsv(): bool {
     try {
       $this->messenger()->addMessage($this->t('Downloading file...'));
       $content = file_get_contents($this->getOption('csv_remote_url'));
@@ -212,7 +192,7 @@ class DrupCsv2PoConverter extends ControllerBase {
   /**
    * @return bool
    */
-  protected function readCsv() {
+  protected function readCsv(): bool {
     $this->messenger()->addMessage($this->t('Reading file...'));
 
     try {
@@ -255,7 +235,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @param string $langcode
    */
-  protected function updatePoFile(string $langcode) {
+  protected function updatePoFile(string $langcode): void {
     $filename = $this->getOption('extension_name') . '.' . $langcode . '.po';
     $filepath = $this->translationDirectoryPath . $filename;
 
@@ -346,7 +326,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @return \Gettext\Translation
    */
-  protected function addTranslation(array $record) {
+  protected function addTranslation(array $record): Translation {
     return Translation::create($record['CONTEXT'], $record['__SOURCE']);
   }
 
@@ -356,7 +336,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @return \Gettext\Translation
    */
-  protected function setTranslation(array $record, Translation $translation) {
+  protected function setTranslation(array $record, Translation $translation): Translation {
     $plural = !empty($record['PLURAL']) ? $record['PLURAL'] : NULL;
 
     if ($plural) {
@@ -381,7 +361,7 @@ class DrupCsv2PoConverter extends ControllerBase {
   /**
    * @return void
    */
-  protected function cleanup() {
+  protected function cleanup(): void {
     $url = Url::fromRoute('locale.translate_status');
     $this->messenger()
       ->addStatus($this->t('Everything done. Check newly po generated files and go to the <a href=":url">:url</a> to import updates', [
@@ -395,7 +375,7 @@ class DrupCsv2PoConverter extends ControllerBase {
    *
    * @return $this
    */
-  private function setDefaultOptions() {
+  private function setDefaultOptions(): static {
     $defaults = self::$defaultOptions;
 
     $settings = Settings::get('drup_csv2po');
